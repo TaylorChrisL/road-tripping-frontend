@@ -74,7 +74,6 @@ export default {
       </div>
       <div v-for="place in places" v-bind:key="place.id">
         <h5>{{ place.name }}</h5>
-        <p>{{ place.name }}</p>
         <button v-on:click="destroyPlace(place)">Delete this Place</button>
       </div>
       <router-link to="/trips">Return to All trips</router-link>
