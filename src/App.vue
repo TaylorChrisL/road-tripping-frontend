@@ -16,6 +16,8 @@ export default {
   <nav>
     <router-link to="/">Home</router-link>
     |
+    <router-link v-if="isLoggedIn" to="/trips">Trips</router-link>
+    |
     <router-link v-if="!isLoggedIn" to="/signup">Sign Up</router-link>
     |
     <router-link v-if="!isLoggedIn" to="/login">Log In</router-link>
