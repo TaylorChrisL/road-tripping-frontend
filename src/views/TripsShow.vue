@@ -1,11 +1,20 @@
 <script>
 import axios from "axios";
+import mapboxgl from "mapbox-gl";
+import MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
+import "@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css";
 export default {
   data: function () {
     return {
       trip: {},
       newPlaceParams: {},
       places: [],
+      loading: false,
+      location: "",
+      access_token: process.env.VUE_APP_MY_API_KEY,
+      center: [-98.57945, 39.828201],
+      map: {},
+      clickMarker: {},
     };
   },
   created: function () {
@@ -15,16 +24,93 @@ export default {
       this.trip.places.forEach((place) => {
         this.places.push(place);
       });
+      this.createMap();
     });
   },
+  // mounted() {
+  //   this.createMap();
+  // },
   methods: {
+    async createMap() {
+      try {
+        mapboxgl.accessToken = this.access_token;
+        this.map = new mapboxgl.Map({
+          container: "map",
+          style: "mapbox://styles/mapbox/streets-v11",
+          center: this.center,
+          zoom: 3,
+        });
+        let geocoder = new MapboxGeocoder({
+          accessToken: this.access_token,
+          mapboxgl: mapboxgl,
+          marker: false,
+        });
+
+        this.map.addControl(geocoder);
+
+        const markers = [];
+        this.places.forEach((place) => {
+          console.log(place);
+          markers.push(new mapboxgl.Marker().setLngLat([place.longitude, place.latitude]).addTo(this.map));
+        });
+
+        geocoder.on("result", (e) => {
+          console.log(e.result.center);
+          if (Object.keys(this.clickMarker).length === 0) {
+            this.clickMarker = new mapboxgl.Marker({
+              color: "#D80739",
+            })
+              .setLngLat(e.result.center)
+              .addTo(this.map);
+            this.center[0] = e.result.center[0];
+            this.center[1] = e.result.center[1];
+          } else {
+            this.setMarker(e.result.center[0], e.result.center[1]);
+          }
+        });
+
+        this.map.on("click", (e) => {
+          console.log(e);
+          if (Object.keys(this.clickMarker).length === 0) {
+            this.clickMarker = new mapboxgl.Marker({
+              color: "#D80739",
+            })
+              .setLngLat(e.lngLat)
+              .addTo(this.map);
+            this.center[0] = e.lngLat.lng;
+            this.center[1] = e.lngLat.lat;
+          } else {
+            this.setMarker(e.lngLat.lng, e.lngLat.lat);
+          }
+        });
+      } catch (err) {
+        console.log("map error", err);
+      }
+    },
+    setMarker(lng, lat) {
+      this.clickMarker.setLngLat([lng, lat]);
+      this.center[0] = lng;
+      this.center[1] = lat;
+    },
+    copyLocation() {
+      if (this.location) {
+        navigator.clipboard.writeText(this.location);
+        alert("Location Copied");
+      }
+      return;
+    },
     createPlace: function () {
+      this.newPlaceParams.longitude = this.center[0];
+      this.newPlaceParams.latitude = this.center[1];
       axios
         .post("http://localhost:3000/places", this.newPlaceParams)
         .then((response) => {
           console.log("place created ", response.data);
           this.places.push(response.data);
-          this.newplaceParams = {};
+          new mapboxgl.Marker()
+            .setLngLat([this.newPlaceParams.longitude, this.newPlaceParams.latitude])
+            .addTo(this.map);
+          for (var member in this.newPlaceParams) delete this.newPlaceParams[member];
           this.newPlaceParams.trip_id = this.trip.id;
         })
         .catch((error) => (this.errorMessage = error));
@@ -72,18 +158,116 @@ export default {
       <div>
         <button v-on:click="createPlace()">Create</button>
       </div>
-      <div v-for="place in places" v-bind:key="place.id">
-        <h5>{{ place.name }}</h5>
-        <button v-on:click="destroyPlace(place)">Delete this Place</button>
+      <div class="main">
+        <div class="flex">
+          <!-- Map Display here -->
+          <div class="map-holder">
+            <div id="map"></div>
+          </div>
+          <!-- Coordinates Display here -->
+          <div class="dislpay-arena">
+            <div class="coordinates-header">
+              <h3>Current Coordinates</h3>
+              <p>Longitude: {{ center[0] }}</p>
+              <p>Latitude: {{ center[1] }}</p>
+            </div>
+          </div>
+        </div>
       </div>
-      <router-link to="/trips">Return to All trips</router-link>
     </div>
+    <div v-for="place in places" v-bind:key="place.id">
+      <h5>{{ place.name }}</h5>
+      <h6>Longitude: {{ place.longitude }}</h6>
+      <h6>latitude: {{ place.latitude }}</h6>
+      <button v-on:click="destroyPlace(place)">Delete this Place</button>
+    </div>
+    <router-link to="/trips">Return to All trips</router-link>
   </div>
 </template>
 
 <style>
-img {
-  max-width: 200px;
-  max-height: 300px;
+.main {
+  padding: 45px 50px;
+}
+.flex {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+.map-holder {
+  width: 65%;
+}
+#map {
+  height: 70vh;
+}
+.dislpay-arena {
+  background: #ffffff;
+  box-shadow: 0px -3px 10px rgba(0, 58, 78, 0.1);
+  border-radius: 5px;
+  padding: 20px 30px;
+  width: 25%;
+}
+.coordinates-header {
+  margin-bottom: 50px;
+}
+.coordinates-header h3 {
+  color: #1f2a53;
+  font-weight: 600;
+}
+.coordinates-header p {
+  color: rgba(13, 16, 27, 0.75);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+.form-group {
+  position: relative;
+}
+.location-control {
+  height: 30px;
+  background: #ffffff;
+  border: 1px solid rgba(31, 42, 83, 0.25);
+  box-shadow: 0px 0px 10px rgba(73, 165, 198, 0.1);
+  border-radius: 4px;
+  padding: 0px 10px;
+  width: 90%;
+}
+.location-control:focus {
+  outline: none;
+}
+.location-btn {
+  margin-top: 15px;
+  padding: 10px 15px;
+  background: #d80739;
+  box-shadow: 0px 4px 10px rgba(73, 165, 198, 0.1);
+  border-radius: 5px;
+  border: 0;
+  cursor: pointer;
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.location-btn:focus {
+  outline: none;
+}
+.disabled {
+  background: #db7990;
+  cursor: not-allowed;
+}
+.copy-btn {
+  background: #f4f6f8 0% 0% no-repeat padding-box;
+  border: 1px solid #f4f6f8;
+  border-radius: 0px 3px 3px 0px;
+  position: absolute;
+  color: #5171ef;
+  font-size: 0.875rem;
+  font-weight: 500;
+  height: 30px;
+  padding: 0px 10px;
+  cursor: pointer;
+  right: 3.5%;
+  top: 5%;
+}
+.copy-btn:focus {
+  outline: none;
 }
 </style>
