@@ -50,27 +50,26 @@ export default {
 
         const markers = [];
         this.places.forEach((place) => {
-          console.log(place);
           markers.push(new mapboxgl.Marker().setLngLat([place.longitude, place.latitude]).addTo(this.map));
         });
 
         geocoder.on("result", (e) => {
-          console.log(e.result.center);
           if (Object.keys(this.clickMarker).length === 0) {
             this.clickMarker = new mapboxgl.Marker({
               color: "#D80739",
             })
               .setLngLat(e.result.center)
               .addTo(this.map);
+            this.mapClickFn();
             this.center[0] = e.result.center[0];
             this.center[1] = e.result.center[1];
           } else {
             this.setMarker(e.result.center[0], e.result.center[1]);
           }
+          this.mapClickFn(e.result.center[0], e.result.center[1]);
         });
 
         this.map.on("click", (e) => {
-          console.log(e);
           if (Object.keys(this.clickMarker).length === 0) {
             this.clickMarker = new mapboxgl.Marker({
               color: "#D80739",
@@ -82,6 +81,7 @@ export default {
           } else {
             this.setMarker(e.lngLat.lng, e.lngLat.lat);
           }
+          this.mapClickFn(e.lngLat.lng, e.lngLat.lat);
         });
       } catch (err) {
         console.log("map error", err);
@@ -98,6 +98,24 @@ export default {
         alert("Location Copied");
       }
       return;
+    },
+    mapClickFn(lng, lat) {
+      const url =
+        "https://api.mapbox.com/geocoding/v5/mapbox.places/" +
+        lng +
+        "," +
+        lat +
+        ".json?access_token=" +
+        this.access_token +
+        "&types=address";
+      axios.get(url).then((response) => {
+        console.log(response.data.features[0].place_name);
+        var placeData = response.data.features[0].place_name.split(",");
+        var zipCode = placeData[2].split(" ")[placeData[2].split(" ").length - 1];
+        this.newPlaceParams.address = placeData[0];
+        this.newPlaceParams.city = placeData[1];
+        this.newPlaceParams.zip_code = zipCode;
+      });
     },
     createPlace: function () {
       this.newPlaceParams.longitude = this.center[0];
@@ -146,14 +164,6 @@ export default {
       <div>
         <label for="zip_code">zip_code of Place:</label>
         <input type="text" v-model="newPlaceParams.zip_code" id="zip_code" placeholder="zip_code of place" />
-      </div>
-      <div>
-        <label for="longitude">longitude of Place:</label>
-        <input type="text" v-model="newPlaceParams.longitude" id="longitude" placeholder="longitude of place" />
-      </div>
-      <div>
-        <label for="latitude">latitude of Place:</label>
-        <input type="text" v-model="newPlaceParams.latitude" id="latitude" placeholder="latitude of place" />
       </div>
       <div>
         <button v-on:click="createPlace()">Create</button>
