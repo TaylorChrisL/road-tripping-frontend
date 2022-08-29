@@ -1,6 +1,7 @@
 <script>
 import axios from "axios";
 import mapboxgl from "mapbox-gl";
+import turf from "turf";
 import MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
 import "@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css";
 export default {
@@ -44,6 +45,31 @@ export default {
           accessToken: this.access_token,
           mapboxgl: mapboxgl,
           marker: false,
+        });
+
+        this.map.on("load", async () => {
+          this.map.addSource("route", {
+            type: "geojson",
+            data: {
+              type: "FeatureCollection",
+              features: [],
+            },
+          });
+
+          this.map.addLayer({
+            id: "routeline-active",
+            type: "line",
+            source: "route",
+            layout: {
+              "line-join": "round",
+              "line-cap": "round",
+            },
+            paint: {
+              "line-color": "#3887be",
+              "line-width": ["interpolate", ["linear"], ["zoom"], 12, 3, 22, 12],
+            },
+          });
+          await this.map.on();
         });
 
         this.map.addControl(geocoder);
@@ -115,6 +141,21 @@ export default {
         this.newPlaceParams.address = placeData[0];
         this.newPlaceParams.city = placeData[1];
         this.newPlaceParams.zip_code = zipCode;
+      });
+    },
+    getOptimization() {
+      var locations = [];
+      this.places.forEach((place) => {
+        locations.push(`${place.longitude},${place.latitude}`);
+      });
+      var url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${locations.join(
+        ";"
+      )}?source=first&destination=last&geometries=geojson&access_token=${this.access_token}`;
+
+      axios.get(url).then((response) => {
+        var routeGeoJson = turf.featureCollection(turf.feature(response.data.trips[0].geometry));
+        this.map.getSource("route").setData(routeGeoJson);
+        console.log(this.map.getSource("route"));
       });
     },
     createPlace: function () {
@@ -192,6 +233,7 @@ export default {
       <button v-on:click="destroyPlace(place)">Delete this Place</button>
     </div>
     <router-link to="/trips">Return to All trips</router-link>
+    <button v-on:click="getOptimization()">Optimize Route</button>
   </div>
 </template>
 
