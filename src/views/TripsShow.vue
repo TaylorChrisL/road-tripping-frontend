@@ -15,6 +15,9 @@ export default {
       access_token: process.env.VUE_APP_MY_API_KEY,
       center: [-98.57945, 39.828201],
       map: {},
+      query: {},
+      response: {},
+      nothing: turf.featureCollection([]),
       clickMarker: {},
     };
   },
@@ -50,10 +53,7 @@ export default {
         this.map.on("load", async () => {
           this.map.addSource("route", {
             type: "geojson",
-            data: {
-              type: "FeatureCollection",
-              features: [],
-            },
+            data: this.nothing,
           });
 
           this.map.addLayer({
@@ -69,7 +69,6 @@ export default {
               "line-width": ["interpolate", ["linear"], ["zoom"], 12, 3, 22, 12],
             },
           });
-          await this.map.on();
         });
 
         this.map.addControl(geocoder);
@@ -143,7 +142,7 @@ export default {
         this.newPlaceParams.zip_code = zipCode;
       });
     },
-    getOptimization() {
+    async getOptimization() {
       var locations = [];
       this.places.forEach((place) => {
         locations.push(`${place.longitude},${place.latitude}`);
@@ -152,11 +151,14 @@ export default {
         ";"
       )}?source=first&destination=last&geometries=geojson&access_token=${this.access_token}`;
 
-      axios.get(url).then((response) => {
-        var routeGeoJson = turf.featureCollection(turf.feature(response.data.trips[0].geometry));
-        this.map.getSource("route").setData(routeGeoJson);
-        console.log(this.map.getSource("route"));
-      });
+      this.query = await fetch(url, { method: "GET" });
+      this.response = await this.query.json();
+      // Create a GeoJSON feature collection
+      var routeGeoJSON = turf.featureCollection([turf.feature(this.response.trips[0].geometry)]);
+      // Update the `route` source by getting the route source
+      // and setting the data equal to routeGeoJSON
+      this.map.getSource("route").setData(routeGeoJSON);
+      console.log(this.map.getSource("route"));
     },
     createPlace: function () {
       this.newPlaceParams.longitude = this.center[0];
