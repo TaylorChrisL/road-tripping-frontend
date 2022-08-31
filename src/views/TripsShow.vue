@@ -9,6 +9,8 @@ export default {
     return {
       trip: {},
       newPlaceParams: {},
+      startPlace: {},
+      endPlace: {},
       places: [],
       loading: false,
       location: "",
@@ -25,15 +27,9 @@ export default {
     axios.get("/trips/" + this.$route.params.id + ".json").then((response) => {
       this.trip = response.data;
       this.newPlaceParams.trip_id = this.trip.id;
-      this.trip.places.forEach((place) => {
-        this.places.push(place);
-      });
-      this.createMap();
+      this.getPlaces(this.trip);
     });
   },
-  // mounted() {
-  //   this.createMap();
-  // },
   methods: {
     async createMap() {
       try {
@@ -69,15 +65,22 @@ export default {
               "line-width": ["interpolate", ["linear"], ["zoom"], 12, 3, 22, 12],
             },
           });
+          this.getOptimization();
         });
 
         this.map.addControl(geocoder);
 
         const markers = [];
+        markers.push(
+          new mapboxgl.Marker().setLngLat([this.startPlace.longitude, this.startPlace.latitude]).addTo(this.map)
+        );
+        markers.push(
+          new mapboxgl.Marker().setLngLat([this.endPlace.longitude, this.endPlace.latitude]).addTo(this.map)
+        );
         this.places.forEach((place) => {
           markers.push(new mapboxgl.Marker().setLngLat([place.longitude, place.latitude]).addTo(this.map));
         });
-
+        console.log(markers);
         geocoder.on("result", (e) => {
           if (Object.keys(this.clickMarker).length === 0) {
             this.clickMarker = new mapboxgl.Marker({
@@ -143,44 +146,100 @@ export default {
       });
     },
     async getOptimization() {
-      var locations = [];
-      this.places.forEach((place) => {
-        locations.push(`${place.longitude},${place.latitude}`);
-      });
-      var url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${locations.join(
-        ";"
-      )}?source=first&destination=last&geometries=geojson&access_token=${this.access_token}`;
+      if (Object.keys(this.startPlace).length !== 0 && Object.keys(this.endPlace).length !== 0) {
+        var locations = [];
+        this.places.forEach((place) => {
+          locations.push(`${place.longitude},${place.latitude}`);
+        });
+        var url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${this.startPlace.longitude},${
+          this.startPlace.latitude
+        };${locations.join(";")};${this.endPlace.longitude},${
+          this.endPlace.latitude
+        }?source=first&destination=last&roundtrip=false&geometries=geojson&access_token=${this.access_token}`;
 
-      this.query = await fetch(url, { method: "GET" });
-      this.response = await this.query.json();
-      // Create a GeoJSON feature collection
-      var routeGeoJSON = turf.featureCollection([turf.feature(this.response.trips[0].geometry)]);
-      // Update the `route` source by getting the route source
-      // and setting the data equal to routeGeoJSON
-      this.map.getSource("route").setData(routeGeoJSON);
-      console.log(this.map.getSource("route"));
+        this.query = await fetch(url, { method: "GET" });
+        this.response = await this.query.json();
+        // Create a GeoJSON feature collection
+        var routeGeoJSON = turf.featureCollection([turf.feature(this.response.trips[0].geometry)]);
+        // Update the `route` source by getting the route source
+        // and setting the data equal to routeGeoJSON
+        this.map.getSource("route").setData(routeGeoJSON);
+        console.log(this.map.getSource("route"));
+        console.log(this.response);
+      }
+    },
+    getPlaces: async function (trip) {
+      await trip.places.forEach((place) => {
+        if (place.start_point) {
+          this.startPlace = place;
+        } else if (place.end_point) {
+          this.endPlace = place;
+        } else {
+          this.places.push(place);
+        }
+      });
+      this.createMap();
     },
     createPlace: function () {
-      this.newPlaceParams.longitude = this.center[0];
-      this.newPlaceParams.latitude = this.center[1];
-      axios
-        .post("http://localhost:3000/places", this.newPlaceParams)
-        .then((response) => {
-          console.log("place created ", response.data);
-          this.places.push(response.data);
-          new mapboxgl.Marker()
-            .setLngLat([this.newPlaceParams.longitude, this.newPlaceParams.latitude])
-            .addTo(this.map);
-          for (var member in this.newPlaceParams) delete this.newPlaceParams[member];
-          this.newPlaceParams.trip_id = this.trip.id;
-        })
-        .catch((error) => (this.errorMessage = error));
+      if (this.places.length < 10) {
+        this.newPlaceParams.longitude = this.center[0];
+        this.newPlaceParams.latitude = this.center[1];
+        axios
+          .post("http://localhost:3000/places", this.newPlaceParams)
+          .then((response) => {
+            console.log("place created ", response.data);
+            this.places.push(response.data);
+            new mapboxgl.Marker()
+              .setLngLat([this.newPlaceParams.longitude, this.newPlaceParams.latitude])
+              .addTo(this.map);
+            for (var member in this.newPlaceParams) delete this.newPlaceParams[member];
+            this.newPlaceParams.trip_id = this.trip.id;
+            this.getOptimization();
+          })
+          .catch((error) => (this.errorMessage = error));
+      } else {
+        console.log("Max number of places is 12, 1 must be assigned ");
+      }
     },
     destroyPlace: function (place) {
       axios.delete("http://localhost:3000/places/" + place.id).then((response) => {
         console.log("Success!", response.data);
         var index = this.places.indexOf(place);
         this.places.splice(index, 1);
+        this.getOptimization();
+      });
+    },
+    setStartPoint: function (place) {
+      if (Object.keys(this.startPlace).length !== 0) {
+        axios.patch("http://localhost:3000/places/" + this.startPlace.id, { start_point: "false" }).then((response) => {
+          console.log("Previous Start place removed ", response.data);
+          this.places.push(this.startPlace);
+          this.startPlace = {};
+        });
+      }
+      axios.patch("http://localhost:3000/places/" + place.id, { start_point: "true" }).then((response) => {
+        console.log("Start Place updated ", response.data);
+        this.startPlace = response.data;
+        var index = this.places.indexOf(place);
+        this.places.splice(index, 1);
+        this.getOptimization();
+      });
+    },
+    setEndPoint: function (place) {
+      if (Object.keys(this.endPlace).length !== 0) {
+        axios.patch("http://localhost:3000/places/" + this.endPlace.id, { end_point: "false" }).then((response) => {
+          console.log("Previous end place removed ", response.data);
+          this.places.push(this.endPlace);
+          this.endPlace = {};
+        });
+      }
+      axios.patch("http://localhost:3000/places/" + place.id, { end_point: "true" }).then((response) => {
+        console.log("End Place updated ", response.data);
+        this.endPlace = response.data;
+        var index = this.places.indexOf(place);
+        this.places.splice(index, 1);
+
+        this.getOptimization();
       });
     },
   },
@@ -228,14 +287,40 @@ export default {
         </div>
       </div>
     </div>
+    <div>
+      <h5>{{ startPlace.name }}</h5>
+      <h6>Longitude: {{ startPlace.longitude }}</h6>
+      <h6>latitude: {{ startPlace.latitude }}</h6>
+      <button v-on:click="destroyPlace(startPlace)">Delete this Place</button>
+      <div class="temp-button">
+        <button v-on:click="setStartPoint(startPlace)">Set this as Start Point</button>
+        <button v-on:click="setEndPoint(startPlace)">Set this as End Point</button>
+      </div>
+    </div>
     <div v-for="place in places" v-bind:key="place.id">
       <h5>{{ place.name }}</h5>
       <h6>Longitude: {{ place.longitude }}</h6>
       <h6>latitude: {{ place.latitude }}</h6>
       <button v-on:click="destroyPlace(place)">Delete this Place</button>
+      <div class="temp-button">
+        <button v-on:click="setStartPoint(place)">Set this as Start Point</button>
+        <button v-on:click="setEndPoint(place)">Set this as End Point</button>
+      </div>
+    </div>
+    <div>
+      <h5>{{ endPlace.name }}</h5>
+      <h6>Longitude: {{ endPlace.longitude }}</h6>
+      <h6>latitude: {{ endPlace.latitude }}</h6>
+      <button v-on:click="destroyPlace(endPlace)">Delete this Place</button>
+      <div class="temp-button">
+        <button v-on:click="setStartPoint(endPlace)">Set this as Start Point</button>
+        <button v-on:click="setEndPoint(endPlace)">Set this as End Point</button>
+      </div>
     </div>
     <router-link to="/trips">Return to All trips</router-link>
-    <button v-on:click="getOptimization()">Optimize Route</button>
+    <div class="temp-button">
+      <button v-on:click="getOptimization()">Optimize Route</button>
+    </div>
   </div>
 </template>
 
@@ -323,5 +408,8 @@ export default {
 }
 .copy-btn:focus {
   outline: none;
+}
+.temp-button {
+  margin-top: 15px;
 }
 </style>
