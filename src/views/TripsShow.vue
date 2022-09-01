@@ -21,6 +21,7 @@ export default {
       response: {},
       nothing: turf.featureCollection([]),
       clickMarker: {},
+      markers: [],
     };
   },
   created: function () {
@@ -70,17 +71,15 @@ export default {
 
         this.map.addControl(geocoder);
 
-        const markers = [];
-        markers.push(
+        this.markers.push(
           new mapboxgl.Marker().setLngLat([this.startPlace.longitude, this.startPlace.latitude]).addTo(this.map)
         );
-        markers.push(
+        this.markers.push(
           new mapboxgl.Marker().setLngLat([this.endPlace.longitude, this.endPlace.latitude]).addTo(this.map)
         );
         this.places.forEach((place) => {
-          markers.push(new mapboxgl.Marker().setLngLat([place.longitude, place.latitude]).addTo(this.map));
+          this.markers.push(new mapboxgl.Marker().setLngLat([place.longitude, place.latitude]).addTo(this.map));
         });
-        console.log(markers);
         geocoder.on("result", (e) => {
           if (Object.keys(this.clickMarker).length === 0) {
             this.clickMarker = new mapboxgl.Marker({
@@ -137,7 +136,6 @@ export default {
         this.access_token +
         "&types=address";
       axios.get(url).then((response) => {
-        console.log(response.data.features[0].place_name);
         var placeData = response.data.features[0].place_name.split(",");
         var zipCode = placeData[2].split(" ")[placeData[2].split(" ").length - 1];
         this.newPlaceParams.address = placeData[0];
@@ -164,8 +162,6 @@ export default {
         // Update the `route` source by getting the route source
         // and setting the data equal to routeGeoJSON
         this.map.getSource("route").setData(routeGeoJSON);
-        console.log(this.map.getSource("route"));
-        console.log(this.response);
       }
     },
     getPlaces: async function (trip) {
@@ -189,9 +185,11 @@ export default {
           .then((response) => {
             console.log("place created ", response.data);
             this.places.push(response.data);
-            new mapboxgl.Marker()
-              .setLngLat([this.newPlaceParams.longitude, this.newPlaceParams.latitude])
-              .addTo(this.map);
+            this.markers.push(
+              new mapboxgl.Marker()
+                .setLngLat([this.newPlaceParams.longitude.toFixed(6), this.newPlaceParams.latitude.toFixed(6)])
+                .addTo(this.map)
+            );
             for (var member in this.newPlaceParams) delete this.newPlaceParams[member];
             this.newPlaceParams.trip_id = this.trip.id;
             this.getOptimization();
@@ -206,6 +204,17 @@ export default {
         console.log("Success!", response.data);
         var index = this.places.indexOf(place);
         this.places.splice(index, 1);
+        var arr = this.markers.map((marker) => marker._lngLat);
+        var indexToDelete;
+        arr.forEach((lngLat, i) => {
+          if (lngLat.lng == place.longitude && lngLat.lat == place.latitude) {
+            indexToDelete = i;
+          }
+        });
+        // console.log(this.markers.map((marker) => marker._lngLat).map((lngLat) => [lngLat.lng, lngLat.lat]));
+        // console.log([parseFloat(place.longitude), parseFloat(place.latitude)]);
+        console.log(indexToDelete);
+        this.markers[indexToDelete].remove();
         this.getOptimization();
       });
     },
