@@ -71,14 +71,37 @@ export default {
 
         this.map.addControl(geocoder);
 
-        this.markers.push(
-          new mapboxgl.Marker().setLngLat([this.startPlace.longitude, this.startPlace.latitude]).addTo(this.map)
-        );
-        this.markers.push(
-          new mapboxgl.Marker().setLngLat([this.endPlace.longitude, this.endPlace.latitude]).addTo(this.map)
-        );
+        // this.markers.push(
+        //   new mapboxgl.Marker()
+        //     .setPopup(
+        //       new mapboxgl.Popup({ offset: 0, closeButton: false, closeOnClick: false, anchor: "top-left" }).setHTML(
+        //         this.startPlace.name
+        //       )
+        //     )
+        //     .setLngLat([this.startPlace.longitude, this.startPlace.latitude])
+        //     .addTo(this.map)
+        // );
+        // this.markers.push(
+        //   new mapboxgl.Marker()
+        //     .setPopup(
+        //       new mapboxgl.Popup({ offset: 0, closeButton: false, closeOnClick: false, anchor: "top-left" }).setHTML(
+        //         this.endPlace.name
+        //       )
+        //     )
+        //     .setLngLat([this.endPlace.longitude, this.endPlace.latitude])
+        //     .addTo(this.map)
+        // );
         this.places.forEach((place) => {
-          this.markers.push(new mapboxgl.Marker().setLngLat([place.longitude, place.latitude]).addTo(this.map));
+          this.markers.push(
+            new mapboxgl.Marker()
+              .setPopup(
+                new mapboxgl.Popup({ offset: 0, closeButton: false, closeOnClick: false, anchor: "top-left" }).setHTML(
+                  place.name
+                )
+              )
+              .setLngLat([place.longitude, place.latitude])
+              .addTo(this.map)
+          );
         });
         geocoder.on("result", (e) => {
           if (Object.keys(this.clickMarker).length === 0) {
@@ -149,31 +172,33 @@ export default {
         this.places.forEach((place) => {
           locations.push(`${place.longitude},${place.latitude}`);
         });
-        var url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${this.startPlace.longitude},${
-          this.startPlace.latitude
-        };${locations.join(";")};${this.endPlace.longitude},${
-          this.endPlace.latitude
-        }?source=first&destination=last&roundtrip=false&geometries=geojson&access_token=${this.access_token}`;
+        var url = `https://api.mapbox.com/optimized-trips/v1/mapbox/driving/${locations.join(
+          ";"
+        )}?source=first&destination=last&roundtrip=false&geometries=geojson&access_token=${this.access_token}`;
 
         this.query = await fetch(url, { method: "GET" });
         this.response = await this.query.json();
+        console.log(this.response);
         // Create a GeoJSON feature collection
         var routeGeoJSON = turf.featureCollection([turf.feature(this.response.trips[0].geometry)]);
         // Update the `route` source by getting the route source
         // and setting the data equal to routeGeoJSON
         this.map.getSource("route").setData(routeGeoJSON);
+        this.routeInfo();
       }
     },
     getPlaces: async function (trip) {
       await trip.places.forEach((place) => {
         if (place.start_point) {
           this.startPlace = place;
+          this.places.splice(0, 0, place);
         } else if (place.end_point) {
           this.endPlace = place;
         } else {
           this.places.push(place);
         }
       });
+      this.places.push(this.endPlace);
       this.createMap();
     },
     createPlace: function () {
@@ -187,6 +212,14 @@ export default {
             this.places.push(response.data);
             this.markers.push(
               new mapboxgl.Marker()
+                .setPopup(
+                  new mapboxgl.Popup({
+                    offset: 0,
+                    closeButton: false,
+                    closeOnClick: false,
+                    anchor: "top-left",
+                  }).setHTML(this.newPlaceParams.name)
+                )
                 .setLngLat([this.newPlaceParams.longitude.toFixed(6), this.newPlaceParams.latitude.toFixed(6)])
                 .addTo(this.map)
             );
@@ -196,7 +229,7 @@ export default {
           })
           .catch((error) => (this.errorMessage = error));
       } else {
-        console.log("Max number of places is 12, 1 must be assigned ");
+        console.log("Max number of places is 12, 1 must be assigned to start, and 1 to end ");
       }
     },
     destroyPlace: function (place) {
@@ -222,7 +255,6 @@ export default {
       if (Object.keys(this.startPlace).length !== 0) {
         axios.patch("http://localhost:3000/places/" + this.startPlace.id, { start_point: "false" }).then((response) => {
           console.log("Previous Start place removed ", response.data);
-          this.places.push(this.startPlace);
           this.startPlace = {};
         });
       }
@@ -231,6 +263,7 @@ export default {
         this.startPlace = response.data;
         var index = this.places.indexOf(place);
         this.places.splice(index, 1);
+        this.places.splice(0, 0, place);
         this.getOptimization();
       });
     },
@@ -238,7 +271,6 @@ export default {
       if (Object.keys(this.endPlace).length !== 0) {
         axios.patch("http://localhost:3000/places/" + this.endPlace.id, { end_point: "false" }).then((response) => {
           console.log("Previous end place removed ", response.data);
-          this.places.push(this.endPlace);
           this.endPlace = {};
         });
       }
@@ -247,9 +279,17 @@ export default {
         this.endPlace = response.data;
         var index = this.places.indexOf(place);
         this.places.splice(index, 1);
-
+        this.places.push(place);
         this.getOptimization();
       });
+    },
+    routeInfo: function () {
+      var orderArray = this.response.waypoints.map((waypoint) => waypoint.waypoint_index);
+      var newArray = [];
+      orderArray.forEach((index) => {
+        newArray.push(this.places[index]);
+      });
+      this.places = newArray;
     },
   },
 };
@@ -296,16 +336,6 @@ export default {
         </div>
       </div>
     </div>
-    <div>
-      <h5>{{ startPlace.name }}</h5>
-      <h6>Longitude: {{ startPlace.longitude }}</h6>
-      <h6>latitude: {{ startPlace.latitude }}</h6>
-      <button v-on:click="destroyPlace(startPlace)">Delete this Place</button>
-      <div class="temp-button">
-        <button v-on:click="setStartPoint(startPlace)">Set this as Start Point</button>
-        <button v-on:click="setEndPoint(startPlace)">Set this as End Point</button>
-      </div>
-    </div>
     <div v-for="place in places" v-bind:key="place.id">
       <h5>{{ place.name }}</h5>
       <h6>Longitude: {{ place.longitude }}</h6>
@@ -314,16 +344,6 @@ export default {
       <div class="temp-button">
         <button v-on:click="setStartPoint(place)">Set this as Start Point</button>
         <button v-on:click="setEndPoint(place)">Set this as End Point</button>
-      </div>
-    </div>
-    <div>
-      <h5>{{ endPlace.name }}</h5>
-      <h6>Longitude: {{ endPlace.longitude }}</h6>
-      <h6>latitude: {{ endPlace.latitude }}</h6>
-      <button v-on:click="destroyPlace(endPlace)">Delete this Place</button>
-      <div class="temp-button">
-        <button v-on:click="setStartPoint(endPlace)">Set this as Start Point</button>
-        <button v-on:click="setEndPoint(endPlace)">Set this as End Point</button>
       </div>
     </div>
     <router-link to="/trips">Return to All trips</router-link>
