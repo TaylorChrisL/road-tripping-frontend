@@ -4,6 +4,8 @@ import mapboxgl from "mapbox-gl";
 import turf from "turf";
 import MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
 import "@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css";
+import Pusher from "pusher-js";
+
 export default {
   data: function () {
     return {
@@ -22,6 +24,8 @@ export default {
       nothing: turf.featureCollection([]),
       clickMarker: {},
       markers: [],
+      messages: [],
+      chatMessage: "",
     };
   },
   created: function () {
@@ -30,6 +34,24 @@ export default {
       console.log(this.trip);
       this.newPlaceParams.trip_id = this.trip.id;
       this.getPlaces(this.trip);
+      this.trip.messages.forEach((message) => {
+        this.messages.push(message);
+      });
+    });
+  },
+  mounted: function () {
+    // Enable pusher logging - don't include this in production
+    Pusher.logToConsole = true;
+
+    const pusher = new Pusher("587047a0153b31b66c07", {
+      cluster: "us3",
+    });
+
+    const channel = pusher.subscribe("my-channel");
+    channel.bind("my-event", (data) => {
+      if (data.trip_id == this.trip.id) {
+        this.messages.push(data);
+      }
     });
   },
   methods: {
@@ -295,6 +317,16 @@ export default {
       });
       this.places = newArray;
     },
+    submitMessage: async function () {
+      await axios
+        .post("http://localhost:3000/chat", {
+          message: this.chatMessage,
+          trip_id: this.trip.id,
+        })
+        .then(() => {
+          this.chatMessage = "";
+        });
+    },
   },
 };
 </script>
@@ -354,6 +386,25 @@ export default {
     <div class="temp-button">
       <button v-on:click="getOptimization()">Optimize Route</button>
     </div>
+  </div>
+  <div class="container">
+    <div class="d-flex flex-column align-items-stretch flex-shrink-0 bg-white">
+      <div class="d-flex align-items-center flex-shrink-0 p-3 link-dark text-decoration-none border-bottom">
+        <span class="fs-5 fw-semibold">Trip Chat</span>
+      </div>
+      <div class="list-group list-group-flush border-bottom scrollarea">
+        <div class="list-group-item list-group-item-action py-3 lh-sm" v-for="message in messages" :key="message">
+          <div class="d-flex w-100 align-items-center justify-content-between">
+            <strong class="mb-1">{{ message.sender }}</strong>
+            <small class="text-muted">{{ message.updated_at }}</small>
+          </div>
+          <div class="col-10 mb-1 small">{{ message.message }}</div>
+        </div>
+      </div>
+    </div>
+    <form @submit.prevent="submitMessage()">
+      <input class="form-control" placeholder="Type Message Here" v-model="chatMessage" />
+    </form>
   </div>
 </template>
 
@@ -444,5 +495,8 @@ export default {
 }
 .temp-button {
   margin-top: 15px;
+}
+.scrollarea {
+  min-height: 70vh;
 }
 </style>

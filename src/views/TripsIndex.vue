@@ -47,7 +47,7 @@ export default {
     },
     updateTrip: function (trip) {
       axios.patch("http://localhost:3000/trips/" + trip.id, this.editTripParams).then((response) => {
-        console.log("We dont it!!!", response.data);
+        console.log("We done it!!!", response.data);
       });
     },
   },
