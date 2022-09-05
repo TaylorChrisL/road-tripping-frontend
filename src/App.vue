@@ -5,6 +5,11 @@ export default {
       isLoggedIn: false,
     };
   },
+  methods: {
+    getUserId: function () {
+      return localStorage.getItem("user_id");
+    },
+  },
   watch: {
     $route: function () {
       this.isLoggedIn = !!localStorage.jwt;

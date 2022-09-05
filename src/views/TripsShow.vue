@@ -27,6 +27,7 @@ export default {
   created: function () {
     axios.get("/trips/" + this.$route.params.id + ".json").then((response) => {
       this.trip = response.data;
+      console.log(this.trip);
       this.newPlaceParams.trip_id = this.trip.id;
       this.getPlaces(this.trip);
     });
@@ -198,7 +199,9 @@ export default {
           this.places.push(place);
         }
       });
-      this.places.push(this.endPlace);
+      if (Object.keys(this.endPlace).length !== 0) {
+        this.places.push(this.endPlace);
+      }
       this.createMap();
     },
     createPlace: function () {
@@ -209,7 +212,11 @@ export default {
           .post("http://localhost:3000/places", this.newPlaceParams)
           .then((response) => {
             console.log("place created ", response.data);
-            this.places.push(response.data);
+            if (Object.keys(this.startPlace).length !== 0 && Object.keys(this.endPlace).length !== 0) {
+              this.places.slice(this.places.length - 2, 0, response.data);
+            } else {
+              this.places.push(response.data);
+            }
             this.markers.push(
               new mapboxgl.Marker()
                 .setPopup(
@@ -244,9 +251,6 @@ export default {
             indexToDelete = i;
           }
         });
-        // console.log(this.markers.map((marker) => marker._lngLat).map((lngLat) => [lngLat.lng, lngLat.lat]));
-        // console.log([parseFloat(place.longitude), parseFloat(place.latitude)]);
-        console.log(indexToDelete);
         this.markers[indexToDelete].remove();
         this.getOptimization();
       });

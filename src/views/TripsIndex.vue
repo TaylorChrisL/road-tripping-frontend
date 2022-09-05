@@ -7,6 +7,7 @@ export default {
       currentTrip: {},
       newTripParams: {},
       editTripParams: {},
+      newUserTripParams: {},
     };
   },
   created: function () {
@@ -30,6 +31,13 @@ export default {
         })
         .catch((error) => (this.errorMessage = error))
         .then((this.showErrorMessage = true));
+    },
+    addUser: function () {
+      this.newUserTripParams.trip_id = this.currentTrip.id;
+      axios.post("http://localhost:3000/user_trips", this.newUserTripParams).then((response) => {
+        console.log("User added ", response.data);
+        this.newUserTripParams = {};
+      });
     },
     showTrip: function (trip) {
       console.log(trip);
@@ -60,7 +68,7 @@ export default {
       <h1>{{ trip.name }}</h1>
     </router-link>
     <div>
-      <button v-on:click="showTrip(trip)">Edit Name</button>
+      <button v-on:click="showTrip(trip)">Edit Trip</button>
     </div>
     <hr />
   </div>
@@ -69,6 +77,14 @@ export default {
       <div>
         <label for="editName">Name of Trip:</label>
         <input type="text" v-model="editTripParams.name" id="editName" />
+      </div>
+      <div v-if="currentTrip.owner == this.$root.getUserId()">
+        <label for="addUser">Add User to this Trip:</label>
+        <input type="text" v-model="newUserTripParams.email" id="addUser" />
+        <button v-on:click="addUser()">Submit</button>
+      </div>
+      <div v-for="user in currentTrip.users" :key="user">
+        <h3>{{ user.first_name + " : " + user.email }}</h3>
       </div>
       <button v-on:click="updateTrip(currentTrip)">Save Change</button>
       <button>Close</button>
