@@ -18,17 +18,48 @@ export default {
 };
 </script>
 <template>
-  <nav>
-    <router-link to="/">Home</router-link>
-    |
-    <router-link v-if="isLoggedIn" to="/trips">Trips</router-link>
-    |
-    <router-link v-if="!isLoggedIn" to="/signup">Sign Up</router-link>
-    |
-    <router-link v-if="!isLoggedIn" to="/login">Log In</router-link>
-    |
-    <router-link v-if="isLoggedIn" to="/logout">Log Out</router-link>
-  </nav>
+  <!-- HEADER -->
+  <header class="header" style="padding: 0; margin-bottom: 20px">
+    <nav style="padding: 0; margin-bottom: 20px">
+      <div class="container-fluid clearfix" style="padding: 0; margin-bottom: 20px">
+        <div id="menuzord" class="menuzord menuzord-responsive blue">
+          <router-link to="/" class="menuzord-brand"><img src="../public/roadTripping.png" /></router-link>
+          <ul class="menuzord-menu menuzord-right">
+            <li class="">
+              <router-link to="/">
+                <i class="fa fa-circle"></i>
+                Home
+              </router-link>
+            </li>
+            <li class="">
+              <router-link v-if="isLoggedIn" to="/trips">
+                <i class="fa fa-circle"></i>
+                Trips
+              </router-link>
+            </li>
+            <li class="">
+              <router-link v-if="!isLoggedIn" to="/signup">
+                <i class="fa fa-circle"></i>
+                Sign Up
+              </router-link>
+            </li>
+            <li class="">
+              <router-link v-if="!isLoggedIn" to="/login">
+                <i class="fa fa-circle"></i>
+                Log In
+              </router-link>
+            </li>
+            <li class="">
+              <router-link v-if="isLoggedIn" to="/logout">
+                <i class="fa fa-circle"></i>
+                Log Out
+              </router-link>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </header>
   <router-view />
 </template>
 

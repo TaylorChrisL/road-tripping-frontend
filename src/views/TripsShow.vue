@@ -31,7 +31,6 @@ export default {
   created: function () {
     axios.get("/trips/" + this.$route.params.id + ".json").then((response) => {
       this.trip = response.data;
-      console.log(this.trip);
       this.newPlaceParams.trip_id = this.trip.id;
       this.getPlaces(this.trip);
       this.trip.messages.forEach((message) => {
@@ -133,7 +132,6 @@ export default {
             })
               .setLngLat(e.result.center)
               .addTo(this.map);
-            this.mapClickFn();
             this.center[0] = e.result.center[0];
             this.center[1] = e.result.center[1];
           } else {
@@ -187,6 +185,8 @@ export default {
         this.newPlaceParams.address = placeData[0];
         this.newPlaceParams.city = placeData[1];
         this.newPlaceParams.zip_code = zipCode;
+        this.newPlaceParams.longitude = lng.toFixed(6);
+        this.newPlaceParams.latitude = lat.toFixed(6);
       });
     },
     async getOptimization() {
@@ -201,7 +201,6 @@ export default {
 
         this.query = await fetch(url, { method: "GET" });
         this.response = await this.query.json();
-        console.log(this.response);
         // Create a GeoJSON feature collection
         var routeGeoJSON = turf.featureCollection([turf.feature(this.response.trips[0].geometry)]);
         // Update the `route` source by getting the route source
@@ -235,7 +234,7 @@ export default {
           .then((response) => {
             console.log("place created ", response.data);
             if (Object.keys(this.startPlace).length !== 0 && Object.keys(this.endPlace).length !== 0) {
-              this.places.slice(this.places.length - 2, 0, response.data);
+              this.places.splice(this.places.length - 2, 0, response.data);
             } else {
               this.places.push(response.data);
             }
@@ -332,119 +331,166 @@ export default {
 </script>
 
 <template>
-  <div class="places-show">
-    <div class="container">
-      <h1>{{ trip.name }}</h1>
-      <h3>Add New Place to Trip</h3>
-      <div>
-        <label for="name">Name of Place:</label>
-        <input type="text" v-model="newPlaceParams.name" id="name" placeholder="name of place" />
-      </div>
-      <div>
-        <label for="address">address of Place:</label>
-        <input type="text" v-model="newPlaceParams.address" id="address" placeholder="address of place" />
-      </div>
-      <div>
-        <label for="city">city of Place:</label>
-        <input type="text" v-model="newPlaceParams.city" id="city" placeholder="city of place" />
-      </div>
-      <div>
-        <label for="zip_code">zip_code of Place:</label>
-        <input type="text" v-model="newPlaceParams.zip_code" id="zip_code" placeholder="zip_code of place" />
-      </div>
-      <div>
-        <button v-on:click="createPlace()">Create</button>
-      </div>
-      <div class="main">
-        <div class="flex">
-          <!-- Map Display here -->
-          <div class="map-holder">
-            <div id="map"></div>
-          </div>
-          <!-- Coordinates Display here -->
-          <div class="dislpay-arena">
-            <div class="coordinates-header">
-              <h3>Current Coordinates</h3>
-              <p>Longitude: {{ center[0] }}</p>
-              <p>Latitude: {{ center[1] }}</p>
+  <section class="main-contentiner map-half-content grid-two-items">
+    <div class="container-fluid">
+      <div class="row" style="margin-top: 20px">
+        <div class="col-lg-8 order-lg-2 ps-lg-0">
+          <div class="inner-container">
+            <div class="map-lg-fixed">
+              <div class="map-container">
+                <div id="map" class="map-half"></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-    <div v-for="place in places" v-bind:key="place.id">
-      <h5>{{ place.name }}</h5>
-      <h6>Longitude: {{ place.longitude }}</h6>
-      <h6>latitude: {{ place.latitude }}</h6>
-      <button v-on:click="destroyPlace(place)">Delete this Place</button>
-      <div class="temp-button">
-        <button v-on:click="setStartPoint(place)">Set this as Start Point</button>
-        <button v-on:click="setEndPoint(place)">Set this as End Point</button>
-      </div>
-    </div>
-    <router-link to="/trips">Return to All trips</router-link>
-    <div class="temp-button">
-      <button v-on:click="getOptimization()">Optimize Route</button>
-    </div>
-  </div>
-  <div class="container">
-    <div class="d-flex flex-column align-items-stretch flex-shrink-0 bg-white">
-      <div class="d-flex align-items-center flex-shrink-0 p-3 link-dark text-decoration-none border-bottom">
-        <span class="fs-5 fw-semibold">Trip Chat</span>
-      </div>
-      <div class="list-group list-group-flush border-bottom scrollarea">
-        <div class="list-group-item list-group-item-action py-3 lh-sm" v-for="message in messages" :key="message">
-          <div class="d-flex w-100 align-items-center justify-content-between">
-            <strong class="mb-1">{{ message.sender }}</strong>
-            <small class="text-muted">{{ message.updated_at }}</small>
+        <div class="col-lg-4 px-xl-4">
+          <div class="row">
+            <div class="col-12">
+              <div class="section-title">
+                <h2>{{ trip.name }}</h2>
+              </div>
+              <!-- Search Box 2 -->
+              <div class="search-box-2 bg-light pb-3 pb-md-1">
+                <form class="row" @submit.prevent>
+                  <div class="form-group col-md-6 col-lg-12 col-xl-6">
+                    <div class="input-group mb-2">
+                      <div class="input-group-text">Name</div>
+                      <input
+                        type="text"
+                        v-model="newPlaceParams.name"
+                        class="form-control"
+                        placeholder="Name this place"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="form-group prepend-append col-md-6 col-lg-12 col-xl-6">
+                    <div class="input-group mb-2">
+                      <div class="input-group-text">Address</div>
+                      <input
+                        type="text"
+                        v-model="newPlaceParams.address"
+                        class="form-control"
+                        placeholder="Address"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div class="form-group col-md-6 col-lg-12 col-xl-6">
+                    <div class="input-group mb-2">
+                      <div class="input-group-text">City</div>
+                      <input type="text" v-model="newPlaceParams.city" class="form-control" placeholder="City" />
+                    </div>
+                  </div>
+
+                  <div class="form-group prepend-append col-md-6 col-lg-12 col-xl-6">
+                    <div class="input-group mb-2">
+                      <div class="input-group-text">Zip Code</div>
+                      <input
+                        type="text"
+                        v-model="newPlaceParams.zip_code"
+                        class="form-control"
+                        placeholder="Zip Code"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div class="form-group col-md-6 col-lg-12 col-xl-6">
+                    <div class="input-group mb-2">
+                      <div class="input-group-text">Longitude</div>
+                      <input
+                        type="text"
+                        v-model="newPlaceParams.longitude"
+                        class="form-control"
+                        placeholder="Longitude"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="form-group prepend-append col-md-6 col-lg-12 col-xl-6">
+                    <div class="input-group mb-2">
+                      <div class="input-group-text">Latitude</div>
+                      <input
+                        type="text"
+                        v-model="newPlaceParams.latitude"
+                        class="form-control"
+                        placeholder="Latitude"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div class="form-group col-md-6 col-lg-12 col-xl-3">
+                    <button v-on:click="createPlace()" class="btn btn-primary w-100">Add to Trip</button>
+                  </div>
+                </form>
+              </div>
+            </div>
           </div>
-          <div class="col-10 mb-1 small">{{ message.message }}</div>
+
+          <!-- List items goes here -->
+          <div class="card card-list card-listing" v-for="place in places" v-bind:key="place.id">
+            <div class="row">
+              <!-- <div class="col-sm-5 col-xl-4">
+                <div class="card-list-img">
+                  <span class="badge badge-primary">Verified</span>
+                </div>
+              </div> -->
+
+              <div class="col-sm-12 col-xl-12">
+                <div class="card-body p-0">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h3 class="card-title listing-title mb-0">{{ place.name }}</h3>
+                    <button class="btn-like px-2" v-on:click="destroyPlace(place)">
+                      <i class="fa fa-solid fa-trash text-primary" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <span class="d-block mb-4 listing-address">ADDRESS: {{ place.address }}</span>
+                <span class="d-block mb-4 listing-address">CITY: {{ place.city }}</span>
+                <span class="d-block mb-4 listing-address">ZIP CODE: {{ place.zip_code }}</span>
+                <div class="temp-button">
+                  <button v-on:click="setStartPoint(place)">Set this as Start Point</button>
+                  <button v-on:click="setEndPoint(place)">Set this as End Point</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <router-link to="/trips">Return to All trips</router-link>
+          <div class="container" style="padding-bottom: 20px">
+            <div class="d-flex flex-column align-items-stretch flex-shrink-0 bg-white">
+              <div
+                class="d-flex align-items-center flex-shrink-0 p-3 link-dark text-decoration-none border-bottom"
+                style="background-color: lightblue"
+              >
+                <span class="fs-5 fw-semibold">Trip Chat</span>
+              </div>
+              <div class="list-group list-group-flush border-bottom scrollarea">
+                <div
+                  class="list-group-item list-group-item-action py-3 lh-sm"
+                  v-for="message in messages"
+                  :key="message"
+                  style="background-color: whitesmoke"
+                >
+                  <div class="d-flex w-100 align-items-center justify-content-between">
+                    <strong class="mb-1">{{ message.sender }}</strong>
+                    <small class="text-muted">{{ message.updated_at }}</small>
+                  </div>
+                  <div class="col-10 mb-1 small">{{ message.message }}</div>
+                </div>
+              </div>
+            </div>
+            <form @submit.prevent="submitMessage()">
+              <input class="form-control" placeholder="Type Message Here" v-model="chatMessage" />
+            </form>
+          </div>
         </div>
       </div>
     </div>
-    <form @submit.prevent="submitMessage()">
-      <input class="form-control" placeholder="Type Message Here" v-model="chatMessage" />
-    </form>
-  </div>
+  </section>
 </template>
 
 <style>
-.main {
-  padding: 45px 50px;
-}
-.flex {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-}
-.map-holder {
-  width: 65%;
-}
-#map {
-  height: 70vh;
-}
-.dislpay-arena {
-  background: #ffffff;
-  box-shadow: 0px -3px 10px rgba(0, 58, 78, 0.1);
-  border-radius: 5px;
-  padding: 20px 30px;
-  width: 25%;
-}
-.coordinates-header {
-  margin-bottom: 50px;
-}
-.coordinates-header h3 {
-  color: #1f2a53;
-  font-weight: 600;
-}
-.coordinates-header p {
-  color: rgba(13, 16, 27, 0.75);
-  font-weight: 600;
-  font-size: 0.875rem;
-}
-.form-group {
-  position: relative;
-}
 .location-control {
   height: 30px;
   background: #ffffff;
@@ -476,27 +522,9 @@ export default {
   background: #db7990;
   cursor: not-allowed;
 }
-.copy-btn {
-  background: #f4f6f8 0% 0% no-repeat padding-box;
-  border: 1px solid #f4f6f8;
-  border-radius: 0px 3px 3px 0px;
-  position: absolute;
-  color: #5171ef;
-  font-size: 0.875rem;
-  font-weight: 500;
-  height: 30px;
-  padding: 0px 10px;
-  cursor: pointer;
-  right: 3.5%;
-  top: 5%;
-}
-.copy-btn:focus {
-  outline: none;
-}
-.temp-button {
-  margin-top: 15px;
-}
-.scrollarea {
-  min-height: 70vh;
+.map-half {
+  position: fixed;
+  width: 65vw;
+  height: 75vh;
 }
 </style>
