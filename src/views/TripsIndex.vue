@@ -64,9 +64,9 @@ export default {
     <button v-on:click="createTrip()">Create</button>
   </div>
   <div v-for="trip in trips" v-bind:key="trip.id">
-    <router-link :to="`/trips/${trip.id}`">
+    <a :href="`/trips/${trip.id}`">
       <h1>{{ trip.name }}</h1>
-    </router-link>
+    </a>
     <div>
       <button v-on:click="showTrip(trip)">Edit Trip</button>
     </div>
