@@ -446,12 +446,18 @@ export default {
                   </div>
                 </div>
 
-                <span class="d-block mb-4 listing-address">ADDRESS: {{ place.address }}</span>
-                <span class="d-block mb-4 listing-address">CITY: {{ place.city }}</span>
-                <span class="d-block mb-4 listing-address">ZIP CODE: {{ place.zip_code }}</span>
+                <span class="d-block mb-2 listing-address">ADDRESS: {{ place.address }}</span>
+                <span class="d-block mb-2 listing-address">CITY: {{ place.city }}</span>
+                <span class="d-block mb-2 listing-address">ZIP CODE: {{ place.zip_code }}</span>
+                <span class="d-block mb-2 listing-address">LONGITUDE: {{ place.longitude }}</span>
+                <span class="d-block mb-2 listing-address">LATITUDE: {{ place.latitude }}</span>
                 <div class="temp-button">
-                  <button v-on:click="setStartPoint(place)">Set this as Start Point</button>
-                  <button v-on:click="setEndPoint(place)">Set this as End Point</button>
+                  <button v-on:click="setStartPoint(place)" class="btn btn-outline-primary w-100">
+                    Set this as Start Point
+                  </button>
+                  <button v-on:click="setEndPoint(place)" class="btn btn-outline-primary w-100">
+                    Set this as End Point
+                  </button>
                 </div>
               </div>
             </div>
